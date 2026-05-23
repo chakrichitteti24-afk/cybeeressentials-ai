@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Shield,
   Siren,
+  Upload,
 } from 'lucide-react';
 import {
   ArcElement,
@@ -22,7 +23,7 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import './App.css';
-import { analyzeThreat, getMockLogs, getStats, getThreats, login, scanLogs } from './api/client';
+import { analyzeThreat, getMockLogs, getStats, getThreats, login, scanLogs, uploadCsv } from './api/client';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -233,7 +234,18 @@ function ThreatCard({ threat }) {
   );
 }
 
-function DashboardPage({ stats, threats, loading, scanning, runScan }) {
+function DashboardPage({
+  stats,
+  threats,
+  loading,
+  scanning,
+  csvUploading,
+  csvUploadMessage,
+  selectedCsvFile,
+  runScan,
+  onCsvFileChange,
+  onCsvUpload,
+}) {
   const recent = threats.slice(0, 4);
   return (
     <div className="space-y-6">
@@ -243,6 +255,38 @@ function DashboardPage({ stats, threats, loading, scanning, runScan }) {
         <StatCard title="Medium Threats" value={stats.medium ?? 0} tone="text-amber-300" icon={Siren} />
         <StatCard title="Low Threats" value={stats.low ?? 0} tone="text-emerald-300" icon={BarChart3} />
       </div>
+      <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Upload Web Server CSV</h2>
+            <p className="text-sm text-slate-400">Headers: IP, Time, URL, Staus</p>
+          </div>
+          <label className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 ${csvUploading ? 'cursor-not-allowed opacity-60' : ''}`}>
+            <FileText className="h-4 w-4 shrink-0" />
+            <span className="max-w-56 truncate">{selectedCsvFile?.name || 'Choose CSV'}</span>
+            <input
+              className="sr-only"
+              type="file"
+              accept=".csv,text/csv"
+              disabled={csvUploading}
+              onChange={onCsvFileChange}
+            />
+          </label>
+          <button
+            className="flex items-center gap-2 rounded-lg bg-sky-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={csvUploading || !selectedCsvFile}
+            onClick={onCsvUpload}
+          >
+            {csvUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {csvUploading ? 'Uploading' : 'Upload CSV'}
+          </button>
+        </div>
+        {csvUploadMessage && (
+          <div className="mt-4 rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300">
+            {csvUploadMessage}
+          </div>
+        )}
+      </section>
       <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -359,14 +403,42 @@ function EmptyState() {
   );
 }
 
-function AppShell({ activePage, setActivePage, stats, threats, loading, scanning, refresh, runScan, onLogout }) {
+function AppShell({
+  activePage,
+  setActivePage,
+  stats,
+  threats,
+  loading,
+  scanning,
+  csvUploading,
+  csvUploadMessage,
+  selectedCsvFile,
+  refresh,
+  runScan,
+  onCsvFileChange,
+  onCsvUpload,
+  onLogout,
+}) {
   const title = navItems.find((item) => item.id === activePage)?.label || 'Dashboard';
   const page = useMemo(() => {
     if (activePage === 'feed') return <ThreatFeedPage threats={threats} loading={loading} />;
     if (activePage === 'analytics') return <AnalyticsPage stats={stats} threats={threats} />;
     if (activePage === 'reports') return <ReportsPage stats={stats} threats={threats} />;
-    return <DashboardPage stats={stats} threats={threats} loading={loading} scanning={scanning} runScan={runScan} />;
-  }, [activePage, loading, scanning, stats, threats]);
+    return (
+      <DashboardPage
+        stats={stats}
+        threats={threats}
+        loading={loading}
+        scanning={scanning}
+        csvUploading={csvUploading}
+        csvUploadMessage={csvUploadMessage}
+        selectedCsvFile={selectedCsvFile}
+        runScan={runScan}
+        onCsvFileChange={onCsvFileChange}
+        onCsvUpload={onCsvUpload}
+      />
+    );
+  }, [activePage, csvUploadMessage, csvUploading, loading, onCsvFileChange, onCsvUpload, scanning, selectedCsvFile, stats, threats]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -428,6 +500,9 @@ export default function App() {
   const [stats, setStats] = useState(emptyStats);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvUploadMessage, setCsvUploadMessage] = useState('');
+  const [selectedCsvFile, setSelectedCsvFile] = useState(null);
 
   async function fetchData() {
     setLoading(true);
@@ -454,6 +529,36 @@ export default function App() {
     }
   }
 
+  function handleCsvFileChange(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setSelectedCsvFile(file || null);
+    setCsvUploadMessage(file ? `Selected ${file.name}.` : '');
+  }
+
+  async function handleCsvUpload() {
+    if (!selectedCsvFile) {
+      setCsvUploadMessage('Choose a CSV file first.');
+      return;
+    }
+
+    setCsvUploading(true);
+    setCsvUploadMessage('');
+    try {
+      const scanResult = await uploadCsv(selectedCsvFile);
+      const normalizedThreats = normalizeThreats(scanResult);
+      setThreats(normalizedThreats);
+      setStats(normalizeStats(scanResult, normalizedThreats));
+      setCsvUploadMessage(`Uploaded ${selectedCsvFile.name}. Scanned ${scanResult.total_logs || 0} logs and found ${scanResult.threats_found || 0} threats.`);
+      setSelectedCsvFile(null);
+      setActivePage('dashboard');
+    } catch (err) {
+      setCsvUploadMessage(err.response?.data?.detail || 'CSV upload failed. Check the file headers and backend connection.');
+    } finally {
+      setCsvUploading(false);
+    }
+  }
+
   useEffect(() => {
     if (authenticated) fetchData();
   }, [authenticated]);
@@ -470,8 +575,13 @@ export default function App() {
       threats={threats}
       loading={loading}
       scanning={scanning}
+      csvUploading={csvUploading}
+      csvUploadMessage={csvUploadMessage}
+      selectedCsvFile={selectedCsvFile}
       refresh={fetchData}
       runScan={runSampleScan}
+      onCsvFileChange={handleCsvFileChange}
+      onCsvUpload={handleCsvUpload}
       onLogout={() => {
         localStorage.removeItem('cybersentinel_token');
         setAuthenticated(false);

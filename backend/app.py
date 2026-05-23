@@ -5,7 +5,8 @@ from pymongo.errors import ConfigurationError, PyMongoError
 
 from database.config import get_settings
 from database.session import create_indexes, get_client
-from routes import analyze, auth, logs, threats
+from routes import analyze, auth, logs, threats, upload_csv
+from services.ai_explanation import ai_status
 
 
 settings = get_settings()
@@ -50,6 +51,10 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "healthy"}
 
+    @application.get("/health/ai")
+    async def health_ai():
+        return ai_status()
+
     @application.on_event("startup")
     def startup():
         if "CLUSTER.mongodb.net" in settings.mongodb_uri or "cluster.mongodb.net" in settings.mongodb_uri:
@@ -66,6 +71,7 @@ def create_app() -> FastAPI:
     application.include_router(logs.router, prefix=settings.api_prefix)
     application.include_router(threats.router, prefix=settings.api_prefix)
     application.include_router(analyze.router, prefix=settings.api_prefix)
+    application.include_router(upload_csv.router, prefix=settings.api_prefix)
     return application
 
 

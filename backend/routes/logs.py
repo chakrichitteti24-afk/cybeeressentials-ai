@@ -8,8 +8,8 @@ from pymongo.database import Database
 from database.session import get_db
 from schemas.logs import LogBatchCreate, LogCreate, LogRead
 from schemas.threats import ScanResult, Threat
-from services.ai_explanation import generate_explanation, recommended_action
-from services.detector import detect_threats
+from services.ai_explanation import generate_ai_analysis
+from services.detector import detect_threat
 from services.risk_scoring import severity_from_score
 
 
@@ -36,6 +36,52 @@ def _serialize_log(log: LogCreate) -> dict:
     data["source"] = data["source"].value if hasattr(data["source"], "value") else data["source"]
     data["created_at"] = datetime.utcnow()
     return data
+
+
+def scan_log_batch(logs: List[LogCreate], db: Database) -> ScanResult:
+    log_rows = [_serialize_log(log) for log in logs]
+    if log_rows:
+        db.security_logs.insert_many(log_rows)
+
+    alerts = []
+    for index, log in enumerate(logs):
+        detection = detect_threat(log)
+        if not detection:
+            continue
+
+        persisted_log = log_rows[index]
+        severity = severity_from_score(detection.risk_score)
+        ai_analysis = generate_ai_analysis(log, detection.threat_type, detection.risk_score)
+        alert = {
+            "id": str(uuid.uuid4()),
+            "log_id": persisted_log["id"],
+            "threat_type": detection.threat_type,
+            "severity": severity.value,
+            "risk_score": detection.risk_score,
+            "confidence": detection.confidence,
+            "source_ip": log.source_ip,
+            "user_id": log.user_id,
+            "description": detection.description,
+            "ai_explanation": ai_analysis["ai_explanation"],
+            "recommended_action": ai_analysis["recommended_fix"],
+            "status": "open",
+            "created_at": datetime.utcnow(),
+        }
+        alerts.append(alert)
+
+    if alerts:
+        db.threat_alerts.insert_many(alerts)
+
+    threats = [_to_legacy_threat(alert) for alert in alerts]
+    return ScanResult(
+        total_logs=len(logs),
+        threats_found=len(threats),
+        critical=sum(1 for threat in threats if threat.severity == "critical"),
+        high=sum(1 for threat in threats if threat.severity == "high"),
+        medium=sum(1 for threat in threats if threat.severity == "medium"),
+        low=sum(1 for threat in threats if threat.severity == "low"),
+        threats=threats,
+    )
 
 
 @router.get("/mock", response_model=List[LogRead])
@@ -75,41 +121,4 @@ def ingest_logs(payload: LogBatchCreate, db: Database = Depends(get_db)):
 
 @router.post("/scan", response_model=ScanResult)
 def scan_logs(payload: LogBatchCreate, db: Database = Depends(get_db)):
-    log_rows = [_serialize_log(log) for log in payload.logs]
-    if log_rows:
-        db.security_logs.insert_many(log_rows)
-
-    alerts = []
-    for log, detection in detect_threats(payload.logs):
-        persisted_log = log_rows[payload.logs.index(log)]
-        severity = severity_from_score(detection.risk_score)
-        alert = {
-            "id": str(uuid.uuid4()),
-            "log_id": persisted_log["id"],
-            "threat_type": detection.threat_type,
-            "severity": severity.value,
-            "risk_score": detection.risk_score,
-            "confidence": detection.confidence,
-            "source_ip": log.source_ip,
-            "user_id": log.user_id,
-            "description": detection.description,
-            "ai_explanation": generate_explanation(log, detection.threat_type, detection.risk_score),
-            "recommended_action": recommended_action(detection.threat_type),
-            "status": "open",
-            "created_at": datetime.utcnow(),
-        }
-        alerts.append(alert)
-
-    if alerts:
-        db.threat_alerts.insert_many(alerts)
-
-    threats = [_to_legacy_threat(alert) for alert in alerts]
-    return ScanResult(
-        total_logs=len(payload.logs),
-        threats_found=len(threats),
-        critical=sum(1 for threat in threats if threat.severity == "critical"),
-        high=0,
-        medium=sum(1 for threat in threats if threat.severity == "medium"),
-        low=sum(1 for threat in threats if threat.severity == "low"),
-        threats=threats,
-    )
+    return scan_log_batch(payload.logs, db)

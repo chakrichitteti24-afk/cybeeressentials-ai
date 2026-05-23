@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const instance = axios.create({ baseURL: BASE_URL, timeout: 12000 });
+const instance = axios.create({ baseURL: BASE_URL, timeout: 60000 });
 
 instance.interceptors.request.use((config) => {
   const token = localStorage.getItem('cybersentinel_token');
@@ -26,6 +26,12 @@ export const register = (payload) => instance.post('/auth/register', payload).th
 export const getMockLogs = () => instance.get('/logs/mock').then(res => res.data);
 
 export const scanLogs = (logs) => instance.post('/logs/scan', { logs }).then(res => res.data);
+
+export const uploadCsv = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return instance.post('/upload-csv', formData).then(res => res.data);
+};
 
 export const getThreats = () => instance.get('/threats').then(res => res.data);
 

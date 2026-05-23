@@ -14,6 +14,98 @@ class Detection:
     description: str
 
 
+def _status_code(log: LogCreate) -> Optional[int]:
+    try:
+        return int(str(log.raw_event.get("status", "")).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _detect_web_request(log: LogCreate, message: str) -> Optional[Detection]:
+    status = _status_code(log)
+    suspicious_path_terms = (
+        "/admin",
+        "/adminpanel",
+        "/wp-admin",
+        "/phpmyadmin",
+        "../",
+        "%2e%2e",
+        "union select",
+        "<script",
+        "cmd=",
+        "exec=",
+        "/etc/passwd",
+    )
+    login_terms = ("/login", "/signin", "/auth")
+    failed_auth_terms = ("login.php?value=fail", "sign.php?value=fail")
+
+    if any(term in message for term in failed_auth_terms):
+        return Detection(
+            threat_type="Failed web authentication",
+            risk_score=45,
+            confidence=0.7,
+            description="Web application returned a failed login or signup marker.",
+        )
+
+    if "showcode.php" in message or "contestshowcode.php" in message:
+        return Detection(
+            threat_type="Sensitive source code access",
+            risk_score=64,
+            confidence=0.68,
+            description="Request targets an endpoint that exposes submitted source code.",
+        )
+
+    if log.source_ip in {"chmod:", "rm:", "timeout:", "sh:", "a.out:"}:
+        return Detection(
+            threat_type="Application execution error",
+            risk_score=58,
+            confidence=0.66,
+            description="Malformed web log row contains compiler or runtime error output.",
+        )
+
+    if any(term in message for term in suspicious_path_terms):
+        return Detection(
+            threat_type="Web attack attempt",
+            risk_score=82 if status in {401, 403, 404} else 74,
+            confidence=0.81,
+            description="Web request targets a sensitive path or contains common injection/traversal indicators.",
+        )
+
+    if status in {401, 403} and any(term in message for term in login_terms):
+        return Detection(
+            threat_type="Suspicious web login attempt",
+            risk_score=62,
+            confidence=0.72,
+            description="Web login request returned an authentication or authorization failure.",
+        )
+
+    if status == 403:
+        return Detection(
+            threat_type="Forbidden web request",
+            risk_score=52,
+            confidence=0.64,
+            description="Web request was denied by the server and may indicate probing or blocked access.",
+        )
+
+    if status == 404 and any(term in message for term in ("admin", "config", "backup", ".env", "wp-")):
+        return Detection(
+            threat_type="Web reconnaissance",
+            risk_score=48,
+            confidence=0.62,
+            description="Request for a missing sensitive resource suggests web reconnaissance.",
+        )
+
+    if status and status >= 500:
+        return Detection(
+            threat_type="Web server error spike",
+            risk_score=44,
+            confidence=0.58,
+            description="Web request produced a server error that should be reviewed for exploit attempts or instability.",
+        )
+
+    return None
+
+
 def detect_threat(log: LogCreate) -> Optional[Detection]:
     if is_false_positive(log):
         return None
@@ -24,6 +116,10 @@ def detect_threat(log: LogCreate) -> Optional[Detection]:
     threat_type = "Suspicious event"
     description = log.message
     confidence = 0.45
+
+    web_detection = _detect_web_request(log, message) if "WEB_REQUEST" in event_type else None
+    if web_detection:
+        return web_detection
 
     if "AUTH_FAILURE" in event_type or "failed login" in message:
         score = 78 if any(term in message for term in ["multiple", "repeated", "burst"]) else 45

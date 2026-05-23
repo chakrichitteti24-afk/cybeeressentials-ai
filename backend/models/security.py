@@ -6,6 +6,7 @@ class LogSource(str, Enum):
     firewall = "firewall"
     network = "network"
     user_activity = "user_activity"
+    web_server = "web_server"
 
 
 class AlertSeverity(str, Enum):

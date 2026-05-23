@@ -1,0 +1,4 @@
+.threat-feed { margin-top: 18px; border: 1px solid var(--border); padding: 12px; background: rgba(13,17,23,0.6); border-radius:8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); color: #cdeff6; }
+.threat-feed h2 { font-family: var(--font); color:var(--primary); margin:0 0 12px 0; }
+.empty pre { color: #6de195; font-size:14px; opacity:0.8; }
+.threat-list { max-height:500px; overflow:auto; display:flex; flex-direction:column; gap:10px; padding-right:6px; }

@@ -1,0 +1,20 @@
+.cs-navbar {
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding: 12px 20px;
+  background: #070707;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  border-bottom: 4px solid rgba(0,255,65,0.06);
+  box-shadow: 0 8px 40px rgba(0,255,65,0.02);
+}
+.nav-left { display:flex; align-items:center; gap:12px; color:var(--primary); font-weight:700; }
+.title { letter-spacing:1px; }
+.nav-right { color:var(--danger); font-weight:700; }
+.live-dot { display:flex; align-items:center; gap:8px; }
+.live-dot::before { content: '●'; color: var(--danger); margin-right:6px; animation: blink 1.2s infinite; text-shadow: 0 0 12px rgba(255,0,64,0.25); }
+
+@keyframes blink { 50% { opacity: 0.2; } }

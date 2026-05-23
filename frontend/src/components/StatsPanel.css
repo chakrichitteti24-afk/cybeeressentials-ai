@@ -1,0 +1,12 @@
+.stats-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.stat-card { background: var(--card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 8px; min-width:120px; text-align:center; box-shadow: 0 8px 30px rgba(0,0,0,0.6); transition: transform .12s; }
+.stat-value { font-size:28px; color:var(--primary); font-weight:700; text-shadow: 0 0 8px rgba(0,255,65,0.08); }
+.stat-label { font-size:12px; color:#9aa3b2; letter-spacing:1.2px; margin-top:6px; }
+.glow-critical { border-color: rgba(255,0,64,0.18); box-shadow: 0 0 18px rgba(255,0,64,0.12); }
+.glow-high { border-color: rgba(255,140,0,0.16); box-shadow: 0 0 18px rgba(255,140,0,0.12); }
+.glow-medium { border-color: rgba(255,255,0,0.16); box-shadow: 0 0 18px rgba(255,255,0,0.1); }
+.glow-low { border-color: rgba(0,212,255,0.16); box-shadow: 0 0 18px rgba(0,212,255,0.1); }
+.flicker { animation: flicker 0.95s linear; }
+@keyframes flicker { 0% { opacity:0.6; transform: translateY(0);} 50% { opacity:1; transform: translateY(-2px);} 100% { opacity:0.95; transform: translateY(0);} }
+
+@media (max-width:700px) { .stat-card { min-width: 45%; } }

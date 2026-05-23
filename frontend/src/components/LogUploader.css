@@ -1,0 +1,6 @@
+.log-uploader { margin-top:16px; border:1px solid var(--border); padding:12px; background: #060606; border-radius:8px; }
+.terminal-textarea { width:100%; min-height:120px; background: #020202; color: #00ff41; border: none; padding:12px; font-family: var(--font); font-size:13px; border-radius:6px; box-shadow: inset 0 0 12px rgba(0,255,65,0.02); resize:vertical; }
+.uploader-actions { margin-top:8px; display:flex; gap:8px; justify-content:flex-end; }
+.btn { padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--primary); cursor:pointer; }
+.btn.load { color:var(--cyan); border-color: rgba(0,212,255,0.08); box-shadow: 0 6px 18px rgba(0,212,255,0.02); }
+.btn.scan { color:var(--primary); background: linear-gradient(90deg, rgba(0,255,65,0.06), rgba(0,255,65,0.12)); border-color: rgba(0,255,65,0.08); box-shadow: 0 0 20px rgba(0,255,65,0.08); }

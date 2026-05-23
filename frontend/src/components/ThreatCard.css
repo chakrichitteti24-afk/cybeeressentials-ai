@@ -1,0 +1,13 @@
+.threat-card { background: var(--card); border: 1px solid var(--border); padding: 12px; border-radius: 6px; transition: box-shadow .16s; }
+.threat-card:hover { box-shadow: 0 8px 40px rgba(0,0,0,0.6); transform: translateY(-2px); }
+.threat-row { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+.left { display:flex; gap:12px; align-items:center; }
+.meta { color:#9fb8c9; font-size:13px; }
+.type { color:var(--primary); font-weight:700; }
+.source { font-size:12px; opacity:0.75; margin-top:2px; }
+.expand-arrow { transition: transform .2s ease; color:var(--primary); font-size:18px; transform: rotate(90deg); }
+.expand-arrow.open { transform: rotate(270deg); }
+.description { margin-top:8px; color:#d2e7df; font-size:14px; }
+.analysis { margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.02); color:#cfeeea; font-size:13px; }
+.analysis .explain { margin-bottom:8px; }
+.analysis .fix { color:#ffd1d1; }
